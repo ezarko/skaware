@@ -1,12 +1,9 @@
-FROM ubuntu:14.04
-MAINTAINER Gorka Lerchundi Osa <glertxundi@gmail.com>
+FROM oraclelinux:7.1
 
 ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update && \
-    apt-get -y install git curl build-essential && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN yum -y install git curl make gcc gcc-c++ kernel-devel
 
 COPY skarnet-builder /skarnet-builder
 
