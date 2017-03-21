@@ -1,4 +1,4 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env bash
 set -e
 set -x
 
@@ -8,9 +8,6 @@ DISTDIR=$HOME/dist
 PATCHDIR="$(pwd)/patches"
 
 mkdir -p "$BUILDDIR" "$PACKAGEDIR" "$DISTDIR"
-
-# point to make
-MAKE_4x="$PACKAGEDIR/make/bin/make"
 
 # all packages
 skarnet_all_packages=(
@@ -38,7 +35,6 @@ s6-portable-utils
 declare -A versions
 versions[make]=4.1
 versions[linux]=3.18.5
-versions[musl]=1.0.5
 versions[skalibs]=2.3.8.3
 versions[execline]=2.1.4.5
 #versions[s6]=2.2.4.0
@@ -50,7 +46,7 @@ versions[s6-dns]=2.0.0.7
 versions[s6-networking]=2.1.0.4
 
 declare -A includes
-includes[skalibs]="--with-include=$PACKAGEDIR/musl/include"
+includes[skalibs]=""
 includes[execline]="--with-include=$PACKAGEDIR/skalibs/usr/include ${includes[skalibs]}"
 includes[s6]="--with-include=$PACKAGEDIR/execline/usr/include ${includes[execline]}"
 includes[s6-portable-utils]="${includes[s6]}"
@@ -59,7 +55,7 @@ includes[s6-dns]="${includes[s6]}"
 includes[s6-networking]="--with-include=$PACKAGEDIR/s6-dns/usr/include --with-include=$PACKAGEDIR/s6/usr/include ${includes[s6]}"
 
 declare -A libs
-libs[skalibs]="--with-lib=/usr/musl/lib"
+libs[skalibs]=""
 libs[execline]="--with-lib=$PACKAGEDIR/skalibs/usr/lib ${libs[skalibs]}"
 libs[s6]="--with-lib=$PACKAGEDIR/execline/usr/lib ${libs[execline]}"
 libs[s6-portable-utils]="${libs[s6]}"
@@ -101,8 +97,8 @@ build_install_skarnet_package() {
       version=$(git rev-list -n 1 v${version})
     fi
     git reset --hard ${version}
-    
-    CC="$PACKAGEDIR/musl/bin/musl-gcc" ./configure \
+
+    CC="gcc" ./configure \
       --libdir=/usr/lib \
       --enable-static \
       --disable-shared \
@@ -111,8 +107,8 @@ build_install_skarnet_package() {
       ${libs[$package]} \
       ${sysdeps[$package]} \
       ${configopts[$package]}
-    ${MAKE_4x}
-    ${MAKE_4x} DESTDIR="$PACKAGEDIR/${package}" install
+    make
+    make DESTDIR="$PACKAGEDIR/${package}" install
 }
 
 tar_skarnet_package() {
@@ -143,39 +139,6 @@ tar_skarnet_package() {
     fi
 }
 
-# install make
-cd "$BUILDDIR"
-curl -R -L -O http://ftp.gnu.org/gnu/make/make-${versions[make]}.tar.gz
-tar xf make-${versions[make]}.tar.gz
-cd make-${versions[make]}
-
-./configure --prefix="$PACKAGEDIR/make"
-make
-make install
-
-# install musl
-cd "$BUILDDIR"
-curl -R -L -O http://www.musl-libc.org/releases/musl-${versions[musl]}.tar.gz
-tar xf musl-${versions[musl]}.tar.gz
-cd musl-${versions[musl]}
-
-CFLAGS="-fno-toplevel-reorder -fno-stack-protector" \
-  ./configure                                       \
-    --prefix=$PACKAGEDIR/musl                       \
-    --disable-shared
-${MAKE_4x}
-${MAKE_4x} install
-
-# install linux-headers
-cd "$BUILDDIR"
-curl -R -L -O -C - http://www.kernel.org/pub/linux/kernel/v3.x/linux-${versions[linux]}.tar.xz
-tar xf linux-${versions[linux]}.tar.xz
-cd linux-${versions[linux]}
-for i in $PATCHDIR/linux/*.patch; do
-    patch -p1 -i "${i}" || true
-done
-make headers_install ARCH="$(uname -m)" INSTALL_HDR_PATH="$PACKAGEDIR/linux-headers" CC="$PACKAGEDIR/musl/bin/musl-gcc"
-
 # install skarnet packages
 for package in "${skarnet_all_packages[@]}"; do
     build_install_skarnet_package ${package}
@@ -184,7 +147,7 @@ done
 
 # generate release.md
 releasemsg=""
-releasemsg+="Built using \`make-${versions[make]}\`, \`musl-${versions[musl]}\` and \`linux-headers-${versions[linux]}\`\n"
+releasemsg+="Built using \`make-${versions[make]}\`\n"
 releasemsg+="\n"
 releasemsg+="| Software | Version |\n"
 releasemsg+="| -------- |:-------:|\n"
